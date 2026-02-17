@@ -11,6 +11,7 @@ const App = (() => {
 
   let currentView = 'dashboard';
   let sidebarOpen = false;
+  let sidebarCollapsed = false;
 
   // ---- Initialization ---- //
   function init() {
@@ -64,6 +65,9 @@ const App = (() => {
         // Sidebar
         case 'toggle-sidebar':
           toggleSidebar();
+          break;
+        case 'toggle-sidebar-collapse':
+          toggleSidebarCollapse();
           break;
 
         // Expenses
@@ -181,6 +185,23 @@ const App = (() => {
         toggleSidebar();
       }
     });
+
+    // Profile dropdown toggle
+    var profileTrigger = document.getElementById('profile-trigger');
+    var profileDropdown = document.getElementById('profile-dropdown');
+    if (profileTrigger && profileDropdown) {
+      profileTrigger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        profileDropdown.classList.toggle('active');
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', function(e) {
+        if (!profileTrigger.contains(e.target) && !profileDropdown.contains(e.target)) {
+          profileDropdown.classList.remove('active');
+        }
+      });
+    }
   }
 
   // ---- Page Management (Landing/Auth/App) ---- //
@@ -217,6 +238,9 @@ const App = (() => {
     // Update user info in sidebar
     _updateUserBadge();
     _updateCurrencyBadge();
+
+    // Restore sidebar collapsed state
+    _restoreSidebarState();
 
     // Check if budget is set
     var user = DataStore.getCurrentUser();
@@ -262,7 +286,7 @@ const App = (() => {
 
     // Update page title
     var titles = {
-      'dashboard': 'Dashboard',
+      'dashboard': '',
       'add-expense': 'Add Expense',
       'subscriptions': 'Subscriptions',
       'insights': 'AI Insights',
@@ -270,7 +294,13 @@ const App = (() => {
     };
     var titleEl = document.getElementById('page-title');
     if (titleEl) {
-      titleEl.textContent = titles[viewName] || 'Dashboard';
+      if (viewName === 'dashboard') {
+        var user = DataStore.getCurrentUser();
+        var userName = user && user.name ? user.name.split(' ')[0] : 'there';
+        titleEl.textContent = 'Hi ' + userName;
+      } else {
+        titleEl.textContent = titles[viewName] || 'Dashboard';
+      }
     }
 
     // Render view content
@@ -313,7 +343,7 @@ const App = (() => {
     }
   }
 
-  // ---- Sidebar Toggle ---- //
+  // ---- Sidebar Toggle (Mobile) ---- //
   function toggleSidebar() {
     var sidebar = document.getElementById('sidebar');
     var backdrop = document.querySelector('.sidebar-backdrop');
@@ -332,6 +362,69 @@ const App = (() => {
       if (sidebar) sidebar.classList.remove('open');
       if (backdrop) {
         backdrop.classList.remove('active');
+      }
+    }
+  }
+
+  // ---- Sidebar Collapse/Expand (Desktop) ---- //
+  function toggleSidebarCollapse() {
+    var sidebar = document.getElementById('sidebar');
+    var mainContent = document.querySelector('.main-content');
+    
+    if (!sidebar) return;
+
+    sidebarCollapsed = !sidebarCollapsed;
+
+    if (sidebarCollapsed) {
+      sidebar.classList.add('collapsed');
+      if (mainContent) mainContent.classList.add('sidebar-collapsed');
+    } else {
+      sidebar.classList.remove('collapsed');
+      if (mainContent) mainContent.classList.remove('sidebar-collapsed');
+    }
+
+    // Save state to localStorage
+    try {
+      localStorage.setItem('moneymind-sidebar-collapsed', sidebarCollapsed ? 'true' : 'false');
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+
+    // Add tooltips to nav items when collapsed
+    _updateNavItemTooltips();
+  }
+
+  function _restoreSidebarState() {
+    try {
+      var saved = localStorage.getItem('moneymind-sidebar-collapsed');
+      if (saved === 'true') {
+        sidebarCollapsed = true;
+        var sidebar = document.getElementById('sidebar');
+        var mainContent = document.querySelector('.main-content');
+        if (sidebar) sidebar.classList.add('collapsed');
+        if (mainContent) mainContent.classList.add('sidebar-collapsed');
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    _updateNavItemTooltips();
+  }
+
+  function _updateNavItemTooltips() {
+    var navItems = document.querySelectorAll('.nav-item');
+    var tooltips = {
+      'dashboard': 'Dashboard',
+      'add-expense': 'Add Expense',
+      'subscriptions': 'Subscriptions',
+      'insights': 'Insights',
+      'settings': 'Settings',
+    };
+
+    for (var i = 0; i < navItems.length; i++) {
+      var item = navItems[i];
+      var param = item.getAttribute('data-param');
+      if (param && tooltips[param]) {
+        item.setAttribute('data-tooltip', tooltips[param]);
       }
     }
   }
@@ -737,6 +830,15 @@ const App = (() => {
     _updateUserBadge();
     _updateCurrencyBadge();
 
+    // Update dashboard title if on dashboard
+    if (currentView === 'dashboard') {
+      var titleEl = document.getElementById('page-title');
+      if (titleEl) {
+        var userName = name ? name.split(' ')[0] : 'there';
+        titleEl.textContent = 'Hi ' + userName;
+      }
+    }
+
     if (successEl) successEl.textContent = 'Settings saved successfully!';
     showToast('Settings updated!', 'success');
 
@@ -817,6 +919,29 @@ const App = (() => {
     if (avatar) avatar.textContent = (user.name || 'U').charAt(0).toUpperCase();
     if (nameEl) nameEl.textContent = user.name || 'User';
     if (emailEl) emailEl.textContent = user.email || '';
+
+    // Update top bar profile
+    var topAvatar = document.getElementById('top-profile-avatar');
+    var topName = document.getElementById('top-profile-name');
+    var dropdownAvatar = document.getElementById('dropdown-profile-avatar');
+    var dropdownName = document.getElementById('dropdown-profile-name');
+    var dropdownEmail = document.getElementById('dropdown-profile-email');
+
+    var initial = (user.name || 'U').charAt(0).toUpperCase();
+    if (topAvatar) topAvatar.textContent = initial;
+    if (topName) topName.textContent = user.name || 'User';
+    if (dropdownAvatar) dropdownAvatar.textContent = initial;
+    if (dropdownName) dropdownName.textContent = user.name || 'User';
+    if (dropdownEmail) dropdownEmail.textContent = user.email || '';
+
+    // Update dashboard title if on dashboard
+    if (currentView === 'dashboard') {
+      var titleEl = document.getElementById('page-title');
+      if (titleEl) {
+        var userName = user.name ? user.name.split(' ')[0] : 'there';
+        titleEl.textContent = 'Hi ' + userName;
+      }
+    }
   }
 
   function _updateCurrencyBadge() {
