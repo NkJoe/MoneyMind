@@ -1,4 +1,4 @@
-/* ============================================
+/* ===========================================
    MoneyMind — Prediction Engine
    Calculates burn rate, runway days, budget
    forecasts, and spending projections.
