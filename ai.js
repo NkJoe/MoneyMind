@@ -1,4 +1,4 @@
-/* ============================================
+/* ===========================================
    MoneyMind — AI Engine
    Simulated AI for expense categorization,
    natural language parsing, and insight
