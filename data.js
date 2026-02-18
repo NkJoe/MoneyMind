@@ -112,6 +112,7 @@ const DataStore = (() => {
       password: password,
       currency: currency || 'USD',
       monthlyBudget: 0,
+      plan: 'free',
       createdAt: new Date().toISOString(),
     };
 

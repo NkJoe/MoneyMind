@@ -23,23 +23,52 @@ const Predictions = (() => {
   }
 
   /**
-   * Calculate days until budget runs out at current burn rate.
-   * Returns -1 if no budget set or no spending data.
+   * Calculate budget runway in days using the user's spending pattern.
+   *
+   * Conceptually: "If my monthly budget is $1000 and I spend $5 per day,
+   * how many days does that budget represent?"
+   *
+   * Here:
+   * - monthlyBudget  ~= 1000 (user.monthlyBudget)
+   * - dailySpend     ~= (total expenses this month / days elapsed)
+   *   plus the daily equivalent of active subscriptions
+   * - runwayDays     = monthlyBudget / dailySpend
    */
   function getRunwayDays() {
     const user = DataStore.getCurrentUser();
     if (!user || !user.monthlyBudget || user.monthlyBudget <= 0) return -1;
 
+    const now = new Date();
+    const dayOfMonth = now.getDate(); // 1-based
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    // Total variable expenses entered for the current month
     const expenses = DataStore.getCurrentMonthExpenses();
-    const totalSpend = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const remaining = user.monthlyBudget - totalSpend;
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-    if (remaining <= 0) return 0;
+    // Safety: avoid divide-by-zero if we're at an invalid date context
+    if (dayOfMonth <= 0) return -1;
 
-    const burnRate = getBurnRate();
-    if (burnRate <= 0) return -1;
+    // Average daily variable expenses so far this month
+    const dailyVariableSpend =
+      totalExpenses > 0 ? totalExpenses / dayOfMonth : 0;
 
-    return Math.floor(remaining / burnRate);
+    // Convert active monthly subscriptions into an approximate daily spend
+    const monthlySubs = getMonthlySubscriptionCost();
+    const dailySubsSpend =
+      monthlySubs > 0 && daysInMonth > 0 ? monthlySubs / daysInMonth : 0;
+
+    // Combined daily spend if the user keeps spending like this every day
+    const dailyTotalSpend = dailyVariableSpend + dailySubsSpend;
+
+    // If there is no spending pattern yet, we can't estimate a meaningful runway
+    if (dailyTotalSpend <= 0) return -1;
+
+    // Core logic:
+    // "How many days does my MONTHLY budget represent at this daily spend?"
+    const runway = Math.floor(user.monthlyBudget / dailyTotalSpend);
+
+    return runway >= 0 ? runway : -1;
   }
 
   /**
@@ -100,13 +129,21 @@ const Predictions = (() => {
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const expenses = DataStore.getCurrentMonthExpenses();
+    const subs = DataStore.getSubscriptions().filter(s => s.active);
 
     const dailyData = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dayTotal = expenses
+      const dayExpenseTotal = expenses
         .filter(e => e.date === dateStr)
         .reduce((sum, e) => sum + e.amount, 0);
+
+      // Add subscriptions that bill on this day
+      const daySubsTotal = subs
+        .filter(s => s.dueDay === d)
+        .reduce((sum, s) => sum + s.amount, 0);
+
+      const dayTotal = dayExpenseTotal + daySubsTotal;
 
       dailyData.push({
         day: d,
@@ -126,19 +163,28 @@ const Predictions = (() => {
   function getCategoryBreakdown() {
     const expenses = DataStore.getCurrentMonthExpenses();
     const totalSpend = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const subs = DataStore.getSubscriptions().filter(s => s.active);
+    const subsTotal = subs.reduce((sum, s) => sum + s.amount, 0);
 
-    if (totalSpend === 0) return [];
+    if (totalSpend === 0 && subsTotal === 0) return [];
 
     const categoryTotals = {};
     expenses.forEach(e => {
       categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
     });
 
+    // Group all active subscriptions under the "Subscription" category
+    if (subsTotal > 0) {
+      categoryTotals['Subscription'] = (categoryTotals['Subscription'] || 0) + subsTotal;
+    }
+
+    const totalWithSubs = totalSpend + subsTotal;
+
     return Object.entries(categoryTotals)
       .map(([category, amount]) => ({
         category,
         amount,
-        percentage: Math.round((amount / totalSpend) * 100),
+        percentage: Math.round((amount / totalWithSubs) * 100),
       }))
       .sort((a, b) => b.amount - a.amount);
   }
@@ -168,7 +214,8 @@ const Predictions = (() => {
       projected,
       utilization,
       expenseCount: expenses.length,
-      remaining: budget - totalSpend,
+      // Remaining budget after subtracting BOTH variable expenses and subscriptions
+      remaining: budget - (totalSpend + subCost),
     };
   }
 

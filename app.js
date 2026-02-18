@@ -66,6 +66,15 @@ const App = (() => {
         case 'toggle-sidebar':
           toggleSidebar();
           break;
+        case 'open-upgrade-modal':
+          openUpgradeModal();
+          break;
+        case 'close-upgrade':
+          closeUpgradeModal();
+          break;
+        case 'confirm-upgrade':
+          confirmUpgrade();
+          break;
         case 'toggle-sidebar-collapse':
           toggleSidebarCollapse();
           break;
@@ -238,6 +247,7 @@ const App = (() => {
     // Update user info in sidebar
     _updateUserBadge();
     _updateCurrencyBadge();
+    _updatePlanBadge();
 
     // Restore sidebar collapsed state
     _restoreSidebarState();
@@ -366,6 +376,34 @@ const App = (() => {
     }
   }
 
+  function openUpgradeModal() {
+    var modal = document.getElementById('upgrade-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+  }
+
+  function closeUpgradeModal() {
+    var modal = document.getElementById('upgrade-modal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+
+  function confirmUpgrade() {
+    var user = DataStore.getCurrentUser();
+    if (!user) return;
+
+    DataStore.updateUser({ plan: 'pro' });
+    _updateUserBadge();
+    _updateCurrencyBadge();
+    _updatePlanBadge();
+    closeUpgradeModal();
+
+    showToast('You are now on MoneyMind Pro (demo).', 'success');
+    _renderDashboard();
+  }
+
   // ---- Sidebar Collapse/Expand (Desktop) ---- //
   function toggleSidebarCollapse() {
     var sidebar = document.getElementById('sidebar');
@@ -459,22 +497,33 @@ const App = (() => {
     );
     _setText('burn-rate', DataStore.formatCurrency(summary.burnRate));
 
-    // Runway
+    // Runway card now displays remaining budget (budget - all expenses)
     var runwayEl = document.getElementById('runway-days');
     var runwaySubEl = document.getElementById('runway-sub');
     if (runwayEl && runwaySubEl) {
-      if (summary.runwayDays < 0) {
-        runwayEl.textContent = '-- days';
+      if (summary.budget <= 0) {
+        runwayEl.textContent = '--';
         runwayEl.style.color = 'var(--green)';
-        runwaySubEl.textContent = 'set a budget to see prediction';
-      } else if (summary.runwayDays === 0) {
-        runwayEl.textContent = '0 days';
-        runwayEl.style.color = 'var(--red)';
-        runwaySubEl.textContent = 'budget exceeded!';
+        runwaySubEl.textContent = 'set a monthly budget';
       } else {
-        runwayEl.textContent = summary.runwayDays + ' days';
-        runwayEl.style.color = summary.runwayDays < 7 ? 'var(--red)' : summary.runwayDays < 14 ? 'var(--orange)' : 'var(--green)';
-        runwaySubEl.textContent = 'at current spending rate';
+        var remaining = summary.remaining;
+        if (remaining <= 0) {
+          runwayEl.textContent = DataStore.formatCurrency(0);
+          runwayEl.style.color = 'var(--red)';
+          runwaySubEl.textContent = 'budget exhausted';
+        } else {
+          runwayEl.textContent = DataStore.formatCurrency(remaining);
+          // Color hint based on how much of the budget is left
+          var remainingRatio = remaining / summary.budget;
+          if (remainingRatio < 0.2) {
+            runwayEl.style.color = 'var(--red)';
+          } else if (remainingRatio < 0.5) {
+            runwayEl.style.color = 'var(--orange)';
+          } else {
+            runwayEl.style.color = 'var(--green)';
+          }
+          runwaySubEl.textContent = 'remaining this month';
+        }
       }
     }
 
@@ -488,8 +537,9 @@ const App = (() => {
     // Charts
     setTimeout(function() { Charts.renderAll(); }, 100);
 
-    // Recent expenses
+    // Recent expenses & subscriptions
     _renderRecentExpenses();
+    _renderRecentSubscriptions();
   }
 
   function _renderAlerts(summary) {
@@ -591,6 +641,58 @@ const App = (() => {
         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>' +
       '</button>' +
     '</div>';
+  }
+
+  function _renderRecentSubscriptions() {
+    var container = document.getElementById('recent-subscriptions');
+    if (!container) return;
+
+    var subs = DataStore.getSubscriptions().filter(function(s) { return s.active; });
+
+    if (subs.length === 0) {
+      container.innerHTML = '<div class="empty-state">No subscriptions tracked. Add your first one in Subscriptions.</div>';
+      return;
+    }
+
+    // Sort by createdAt (most recent first) and limit to 5
+    subs.sort(function(a, b) {
+      var ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      var bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bd - ad;
+    });
+    subs = subs.slice(0, 5);
+
+    var today = new Date().getDate();
+    var html = '';
+
+    for (var i = 0; i < subs.length; i++) {
+      var sub = subs[i];
+      var diff = sub.dueDay - today;
+      if (diff < 0) {
+        var daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+        diff = daysInMonth - today + sub.dueDay;
+      }
+
+      var dueBadge = '';
+      if (diff === 0) {
+        dueBadge = '<span class="sub-due-badge sub-due-today">Due today</span>';
+      } else if (diff <= 3) {
+        dueBadge = '<span class="sub-due-badge sub-due-soon">Due in ' + diff + 'd</span>';
+      }
+
+      var initial = sub.name.charAt(0).toUpperCase();
+
+      html += '<div class="sub-item">' +
+        '<div class="sub-icon">' + initial + '</div>' +
+        '<div class="sub-details">' +
+          '<div class="sub-name">' + _escapeHtml(sub.name) + ' ' + dueBadge + '</div>' +
+          '<div class="sub-meta">' + sub.category + ' \u00b7 Bills on the ' + _ordinal(sub.dueDay) + ' of each month</div>' +
+        '</div>' +
+        '<div class="sub-amount">' + DataStore.formatCurrency(sub.amount) + '</div>' +
+      '</div>';
+    }
+
+    container.innerHTML = html;
   }
 
   // ---- Add Expense ---- //
@@ -829,6 +931,7 @@ const App = (() => {
     DataStore.updateUser({ name: name, email: email, currency: currency, monthlyBudget: budget });
     _updateUserBadge();
     _updateCurrencyBadge();
+    _updatePlanBadge();
 
     // Update dashboard title if on dashboard
     if (currentView === 'dashboard') {
@@ -949,6 +1052,24 @@ const App = (() => {
     var badge = document.getElementById('currency-badge');
     if (badge && user) {
       badge.textContent = user.currency || 'USD';
+    }
+  }
+
+  function _updatePlanBadge() {
+    var user = DataStore.getCurrentUser();
+    var badge = document.getElementById('plan-badge');
+    var settingsPlan = document.getElementById('settings-plan');
+    if (!badge || !user) return;
+
+    var plan = user.plan || 'free';
+    var label = plan === 'pro' ? 'Pro' : 'Free';
+
+    badge.textContent = label;
+    badge.classList.remove('plan-badge-free', 'plan-badge-pro');
+    badge.classList.add(plan === 'pro' ? 'plan-badge-pro' : 'plan-badge-free');
+
+    if (settingsPlan) {
+      settingsPlan.textContent = label;
     }
   }
 

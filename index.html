@@ -22,13 +22,16 @@
           <span>MoneyMind</span>
         </div>
         <div class="nav-links">
+          <a href="#page-landing">Home</a>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
           <a href="#" data-action="show-page" data-param="login">Log In</a>
           <button class="btn btn-primary btn-sm" data-action="show-page" data-param="signup">Get Started</button>
         </div>
       </div>
     </nav>
 
-    <section class="hero">
+    <section class="hero" id="hero">
       <div class="hero-badge">AI-Powered Financial Intelligence</div>
       <h1>Understand where your money goes,<br>predict where it's going,<br>and <span class="text-green">stop leaks</span> before they happen.</h1>
       <p class="hero-sub">Track expenses with AI categorization, monitor subscriptions, and get predictive insights — no bank integration required. Works globally with any currency.</p>
@@ -43,7 +46,7 @@
       </div>
     </section>
 
-    <section class="features-section">
+    <section class="features-section" id="features">
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">
@@ -65,6 +68,61 @@
           </div>
           <h3>Predictive Insights</h3>
           <p>Know exactly when you'll run out at current spend rates. AI analyzes patterns and warns you before trouble hits.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing" class="pricing-section">
+      <div class="pricing-inner">
+        <div class="pricing-header">
+          <h2>Simple pricing that grows with you</h2>
+          <p>Start free, then upgrade when you want deeper insights, longer history, and power tools.</p>
+        </div>
+        <div class="pricing-grid">
+          <div class="pricing-card">
+            <div class="pricing-label">Free</div>
+            <div class="pricing-price">
+              <span class="pricing-amount">$0</span>
+              <span class="pricing-period">/month</span>
+            </div>
+            <p class="pricing-tagline">Perfect for getting control of your personal spending.</p>
+            <ul class="pricing-features">
+              <li>Manual expense tracking</li>
+              <li>Basic charts & insights</li>
+              <li>Up to 1 month of history</li>
+              <li>Track subscriptions</li>
+            </ul>
+            <button class="btn btn-primary btn-full" data-action="show-page" data-param="signup">Start Free</button>
+          </div>
+          <div class="pricing-card pricing-card-featured">
+            <div class="pricing-label">Pro</div>
+            <div class="pricing-price">
+              <span class="pricing-amount">$6</span>
+              <span class="pricing-period">/month</span>
+            </div>
+            <p class="pricing-tagline">For power users who want deep visibility and automation.</p>
+            <ul class="pricing-features">
+              <li>Unlimited history</li>
+              <li>Advanced AI insights</li>
+              <li>Export & backup (CSV/JSON)</li>
+              <li>Smart subscription alerts</li>
+            </ul>
+            <button class="btn btn-primary btn-full" data-action="show-page" data-param="signup">Upgrade to Pro</button>
+          </div>
+          <div class="pricing-card">
+            <div class="pricing-label">Teams</div>
+            <div class="pricing-price">
+              <span class="pricing-amount">Custom</span>
+            </div>
+            <p class="pricing-tagline">For households and small teams who budget together.</p>
+            <ul class="pricing-features">
+              <li>Shared workspaces</li>
+              <li>Multiple budgets & wallets</li>
+              <li>Priority support</li>
+              <li>Early access to new features</li>
+            </ul>
+            <button class="btn btn-ghost btn-full" onclick="window.location.href='mailto:hello@example.com?subject=MoneyMind%20Teams%20Inquiry'">Contact Sales</button>
+          </div>
         </div>
       </div>
     </section>
@@ -194,15 +252,7 @@
         </a>
       </nav>
       <div class="sidebar-footer">
-        <div class="user-badge" id="sidebar-user-badge">
-          <div class="user-avatar" id="sidebar-avatar">J</div>
-          <div class="user-info">
-            <span class="user-name" id="sidebar-username">John Doe</span>
-            <span class="user-email" id="sidebar-useremail">john@example.com</span>
-          </div>
-        </div>
         <button class="btn btn-ghost btn-sm sidebar-logout-btn" data-action="logout" style="width:100%;margin-top:8px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
           <span class="sidebar-logout-text">Log Out</span>
         </button>
       </div>
@@ -216,6 +266,7 @@
         <h2 id="page-title">Dashboard</h2>
         <div class="top-bar-right">
           <span class="currency-badge" id="currency-badge">USD</span>
+          <span class="plan-badge plan-badge-free" id="plan-badge">Free</span>
           <div class="profile-menu" id="profile-menu">
             <button class="profile-trigger" id="profile-trigger" aria-label="User menu">
               <div class="profile-avatar" id="top-profile-avatar">J</div>
@@ -314,6 +365,17 @@
           </div>
           <div id="recent-expenses" class="expense-list">
             <div class="empty-state">No expenses logged yet. Start by adding your first expense.</div>
+          </div>
+        </div>
+
+        <!-- Recent Subscriptions -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Recent Subscriptions</h3>
+            <button class="btn btn-ghost btn-sm" data-action="navigate" data-param="subscriptions">Manage</button>
+          </div>
+          <div id="recent-subscriptions" class="subscription-list">
+            <div class="empty-state">No subscriptions tracked. Add your first one in Subscriptions.</div>
           </div>
         </div>
       </div>
@@ -520,6 +582,13 @@
                 <label for="settings-budget">Monthly Budget</label>
                 <input type="number" id="settings-budget" placeholder="0.00" min="0" step="any" required>
               </div>
+              <div class="form-group">
+                <label>Plan</label>
+                <div class="plan-row">
+                  <span id="settings-plan" class="plan-label-text">Free</span>
+                  <button type="button" class="btn btn-ghost btn-sm" data-action="open-upgrade-modal">Upgrade to Pro</button>
+                </div>
+              </div>
               <div id="settings-error" class="form-error"></div>
               <div id="settings-success" class="form-success"></div>
               <button type="submit" class="btn btn-primary btn-full">Save Settings</button>
@@ -549,6 +618,23 @@
 
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
+
+  <!-- Upgrade Modal (Demo) -->
+  <div id="upgrade-modal" class="budget-setup-overlay" style="display:none;">
+    <div class="upgrade-card">
+      <h3>Upgrade to MoneyMind Pro</h3>
+      <p>Unlock unlimited history, deeper AI insights, and power tools for managing your money. This is a demo upgrade — no real payment required.</p>
+      <ul class="pricing-features">
+        <li>Unlimited expense & subscription history</li>
+        <li>More detailed AI insights & charts</li>
+        <li>Priority for upcoming features</li>
+      </ul>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn btn-primary btn-full" data-action="confirm-upgrade">Upgrade (Demo)</button>
+        <button class="btn btn-ghost btn-full" data-action="close-upgrade">Maybe later</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Scripts -->
   <script src="data.js"></script>
